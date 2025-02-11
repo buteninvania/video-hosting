@@ -1,10 +1,10 @@
 import {Router, Request, Response} from "express";
 import {db, setDB} from "../../../db/db";
-import {VideoDbType} from "../../../db/video-db-type";
+import {ResolutionsString, VideoDbType} from "../../../db/video-db-type";
 import {RequestWithBody, RequestWithParams, RequestWithParamsAndBody} from "../../../types";
 import {VideosURIParamsModel} from "../models/VideosURIParamsModel";
 import {VideosViewModel} from "../models/VideosViewModel";
-import {SETTINGS} from "../../../settings";
+import {createNextDate, SETTINGS} from "../../../settings";
 import {VideosCreateModel} from "../models/VideosCreateModel";
 import {OutputErrorsType} from "../types/output-errors-type";
 import {createInputValidation, updateInputValidation} from "../validator/video-data-validator";
@@ -19,7 +19,29 @@ const getVideosViewModel = (dbVideo: VideoDbType): VideosViewModel => {
         minAgeRestriction: dbVideo.minAgeRestriction,
         createdAt: dbVideo.createdAt,
         publicationDate: dbVideo.publicationDate,
-        availableResolution: dbVideo.availableResolution
+        availableResolutions: dbVideo.availableResolutions
+    }
+}
+
+const getAvailableResolutions = (reqBody: VideosCreateModel): ResolutionsString[] => {
+    return reqBody.availableResolutions?.length ? reqBody.availableResolutions : ["P144"];
+}
+
+const createVideo = (reqBody: VideosCreateModel): VideoDbType => {
+    const id = Date.now() + Math.random();
+    const createdAt = new Date().toISOString();
+    const publicationDate = createNextDate(new Date());
+    const availableResolutions = getAvailableResolutions(reqBody);
+
+    return {
+        id,
+        title: reqBody.title,
+        author: reqBody.author,
+        canBeDownloaded: false,
+        minAgeRestriction: null,
+        createdAt,
+        publicationDate,
+        availableResolutions
     }
 }
 
@@ -55,11 +77,7 @@ const videoController = {
             return
         }
 
-        const newVideo: VideoDbType = {
-            ...req.body,
-            id: Date.now() + Math.random()
-        }
-
+        const newVideo = createVideo(req.body);
         const videos = [...db.videos, newVideo];
 
         setDB({videos})

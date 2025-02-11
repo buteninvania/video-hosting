@@ -42,11 +42,11 @@ export const createInputValidation = (video: VideosCreateModel): OutputErrorsTyp
         })
     }
 
-    if (!!video.availableResolution && (!Array.isArray(video.availableResolution)
-        || video.availableResolution.find(p => !Resolutions[p]))
+    if (!!video.availableResolutions && (!Array.isArray(video.availableResolutions)
+        || video.availableResolutions.find(p => !Resolutions[p]))
     ) {
         errors.errorsMessages?.push({
-            message: 'Invalid data type or invalid value', field: 'availableResolution'
+            message: 'Invalid data type or invalid value', field: 'availableResolutions'
         })
     }
 
@@ -90,12 +90,15 @@ export const updateInputValidation = (video: VideosUpdateModel): OutputErrorsTyp
         || video.availableResolution.find(p => !Resolutions[p]))
     ) {
         errors.errorsMessages?.push({
-            message: 'Invalid data type or invalid value', field: 'availableResolution'
+            message: 'Invalid data type or invalid value', field: 'availableResolutions'
         })
     }
 
-    if (video.canBeDownloaded === undefined) {
-        video.canBeDownloaded = false
+    if (video.canBeDownloaded && typeof video.canBeDownloaded !== "boolean") {
+        errors.errorsMessages?.push({
+            message: 'Invalid data type or invalid value',
+            field: 'canBeDownloaded'
+        })
     }
 
     if (!!video.minAgeRestriction && typeof video.minAgeRestriction !== "number") {
@@ -113,13 +116,6 @@ export const updateInputValidation = (video: VideosUpdateModel): OutputErrorsTyp
     if (typeof video?.minAgeRestriction === "number" && video?.minAgeRestriction < ageRestriction.min) {
         errors.errorsMessages?.push({
             message: `The minimum age limit is at least 1 year, and you have ${video.minAgeRestriction}`, field: 'minAgeRestriction'
-        })
-    }
-
-    if (!!video.publicationDate && typeof video?.publicationDate !== "string") {
-        errors.errorsMessages?.push({
-            message: `The publication Date field must be a string and in the string($datetime) format`,
-            field: 'publicationDate'
         })
     }
 

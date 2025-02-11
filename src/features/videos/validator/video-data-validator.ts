@@ -2,6 +2,7 @@ import {VideosCreateModel} from "../models/VideosCreateModel";
 import {OutputErrorsType} from "../types/output-errors-type";
 import {Resolutions} from "../../../db/video-db-type";
 import {VideosUpdateModel} from "../models/VideosUpdateModel";
+import {isISODate} from "../../../settings";
 
 const ageRestriction = {
     max: 18,
@@ -20,10 +21,24 @@ export const createInputValidation = (video: VideosCreateModel): OutputErrorsTyp
         })
     }
 
+    if (video.title && video.title.length > 40) {
+        errors.errorsMessages?.push({
+            field: "title",
+            message: "title must be no more than 40 characters long."
+        })
+    }
+
     if (!video.author) {
         errors.errorsMessages?.push({
             field: "author",
             message: "author is a required field"
+        })
+    }
+
+    if (video.author && video.author.length > 20) {
+        errors.errorsMessages?.push({
+            field: "author",
+            message: "author must be no more than 20 characters long"
         })
     }
 
@@ -50,10 +65,24 @@ export const updateInputValidation = (video: VideosUpdateModel): OutputErrorsTyp
         })
     }
 
+    if (video.title && video.title.length > 40) {
+        errors.errorsMessages?.push({
+            field: "title",
+            message: "title must be no more than 40 characters long."
+        })
+    }
+
     if (!video.author) {
         errors.errorsMessages?.push({
             field: "author",
             message: "author is a required field"
+        })
+    }
+
+    if (video.author && video.author.length > 20) {
+        errors.errorsMessages?.push({
+            field: "author",
+            message: "author must be no more than 20 characters long"
         })
     }
 
@@ -89,12 +118,17 @@ export const updateInputValidation = (video: VideosUpdateModel): OutputErrorsTyp
 
     if (!!video.publicationDate && typeof video?.publicationDate !== "string") {
         errors.errorsMessages?.push({
-            message: `The publication Date field must be a string and in the string($datetime) format`, field: 'publicationDate'
+            message: `The publication Date field must be a string and in the string($datetime) format`,
+            field: 'publicationDate'
         })
     }
 
-    console.log(String(new Date()))
-
+    if (video.publicationDate && !isISODate(video.publicationDate)) {
+        errors.errorsMessages?.push({
+            message: `The publication Date field must be a string and in the string($datetime) format`,
+            field: 'publicationDate'
+        })
+    }
 
     return errors
 }

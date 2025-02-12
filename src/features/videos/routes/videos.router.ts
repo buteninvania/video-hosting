@@ -1,134 +1,58 @@
 import {Router, Request, Response} from "express";
-import {db, setDB} from "../../../db/db";
 import {ResolutionsString, VideoDbType} from "../../../db/video-db-type";
 import {RequestWithBody, RequestWithParams, RequestWithParamsAndBody} from "../../../types";
 import {VideosURIParamsModel} from "../models/VideosURIParamsModel";
 import {VideosViewModel} from "../models/VideosViewModel";
-import {createNextDate, SETTINGS} from "../../../settings";
+import {SETTINGS} from "../../../settings";
 import {VideosCreateModel} from "../models/VideosCreateModel";
 import {OutputErrorsType} from "../types/output-errors-type";
-import {createInputValidation, updateInputValidation} from "../validator/video-data-validator";
 import {VideosUpdateModel} from "../models/VideosUpdateModel";
-
-const getVideosViewModel = (dbVideo: VideoDbType): VideosViewModel => {
-    return {
-        id: dbVideo.id,
-        title: dbVideo.title,
-        author: dbVideo.author,
-        canBeDownloaded: dbVideo.canBeDownloaded,
-        minAgeRestriction: dbVideo.minAgeRestriction,
-        createdAt: dbVideo.createdAt,
-        publicationDate: dbVideo.publicationDate,
-        availableResolutions: dbVideo.availableResolutions
-    }
-}
-
-const getAvailableResolutions = (reqBody: VideosCreateModel): ResolutionsString[] => {
-    return reqBody.availableResolutions?.length ? reqBody.availableResolutions : ["P144"];
-}
-
-const createVideo = (reqBody: VideosCreateModel): VideoDbType => {
-    const id = Date.now() + Math.random();
-    const createdAt = new Date().toISOString();
-    const publicationDate = createNextDate(new Date());
-    const availableResolutions = getAvailableResolutions(reqBody);
-
-    return {
-        id,
-        title: reqBody.title,
-        author: reqBody.author,
-        canBeDownloaded: false,
-        minAgeRestriction: null,
-        createdAt,
-        publicationDate,
-        availableResolutions
-    }
-}
+import {videosRepository} from "../../../repository/videos-repository";
+import {createInputMiddleware, updateInputMiddleware} from "../middleware/videos.middleware";
 
 export const videosRouter = Router();
 
 const videoController = {
     getVideosController: (req: Request, res: Response<VideoDbType[]>) => {
-        const videos = db.videos;
-        res.status(SETTINGS.HTTP_STATUSES.OK).json(videos)
+        res.status(SETTINGS.HTTP_STATUSES.OK).json(videosRepository.getVideos());
     },
     getVideoController: (req: RequestWithParams<VideosURIParamsModel>, res: Response<VideosViewModel>) => {
-        if (!req.params.id) {
-            res.sendStatus(SETTINGS.HTTP_STATUSES.NOT_FOUND)
-            return
-        }
-
-        const foundVideo = db.videos.find(c => c.id === +req.params.id)
-        if (!foundVideo) {
-            res.sendStatus(SETTINGS.HTTP_STATUSES.NOT_FOUND)
-            return
-        }
-
-        res.status(SETTINGS.HTTP_STATUSES.OK);
-        res.json(getVideosViewModel(foundVideo))
-
+        const foundVideo = videosRepository.getVideoById(+req.params.id);
+        foundVideo
+            ? res.status(SETTINGS.HTTP_STATUSES.OK).json(foundVideo)
+            : res.sendStatus(SETTINGS.HTTP_STATUSES.NOT_FOUND);
     },
     createVideoController: (req: RequestWithBody<VideosCreateModel>, res: Response<VideosViewModel | OutputErrorsType>) => {
-        const errorsMessages = createInputValidation(req.body);
+        const {title, author} = req.body;
+        const availableResolutions: ResolutionsString[] = req.body.availableResolutions?.length
+            ? req.body.availableResolutions
+            : ["P144"]
 
-        if (errorsMessages.errorsMessages?.length) {
-            res.status(SETTINGS.HTTP_STATUSES.BAD_REQUEST)
-            res.json(errorsMessages)
-            return
-        }
+        const videoId = videosRepository.createVideo(
+            title,
+            author,
+            availableResolutions
+        );
 
-        const newVideo = createVideo(req.body);
-        const videos = [...db.videos, newVideo];
-
-        setDB({videos})
-
-        res
-            .status(SETTINGS.HTTP_STATUSES.CREATED)
-            .json(newVideo)
+        const newVideo = videosRepository.getVideoById(videoId);
+        newVideo
+            ? res.status(SETTINGS.HTTP_STATUSES.CREATED).json(newVideo)
+            : res.status(SETTINGS.HTTP_STATUSES.BAD_REQUEST)
     },
     updateVideoController: (req: RequestWithParamsAndBody<VideosURIParamsModel, VideosUpdateModel>, res: Response<OutputErrorsType | null>) => {
-        const errorsMessages = updateInputValidation(req.body);
-
-        if (!req.params.id) {
-            res.sendStatus(SETTINGS.HTTP_STATUSES.NOT_FOUND);
-            return;
-        }
-
-        let foundVideo = db.videos.find(v => v.id === +req.params.id)
-
-        if (!foundVideo) {
-            res.sendStatus(SETTINGS.HTTP_STATUSES.NOT_FOUND);
-            return;
-        }
-
-        if (errorsMessages.errorsMessages?.length) {
-            res.status(SETTINGS.HTTP_STATUSES.BAD_REQUEST)
-            res.json(errorsMessages)
-            return
-        }
-
-        Object.assign(foundVideo, req.body)
-
-        res.sendStatus(SETTINGS.HTTP_STATUSES.NO_CONTENT);
+        videosRepository.updateVideo(+req.params.id, req.body)
+            ? res.sendStatus(SETTINGS.HTTP_STATUSES.NO_CONTENT)
+            : res.sendStatus(SETTINGS.HTTP_STATUSES.NOT_FOUND);
     },
     deleteVideoController: (req: RequestWithParams<VideosURIParamsModel>, res: Response) => {
-        const foundVideo = db.videos.find(v => v.id === +req.params.id);
-
-        if (!foundVideo) {
-            res.sendStatus(SETTINGS.HTTP_STATUSES.NOT_FOUND);
-            return;
-        }
-
-        const videos = db.videos.filter(v => v.id !== foundVideo.id)
-
-        setDB({videos})
-
-        res.sendStatus(SETTINGS.HTTP_STATUSES.NO_CONTENT);
+        videosRepository.deleteProduct(+req.params.id)
+        ? res.sendStatus(SETTINGS.HTTP_STATUSES.NO_CONTENT)
+        : res.sendStatus(SETTINGS.HTTP_STATUSES.NOT_FOUND);
     }
 }
 
 videosRouter.get('/', videoController.getVideosController)
 videosRouter.get('/:id', videoController.getVideoController)
-videosRouter.post('/', videoController.createVideoController)
-videosRouter.put('/:id', videoController.updateVideoController)
+videosRouter.post('/',createInputMiddleware, videoController.createVideoController)
+videosRouter.put('/:id', updateInputMiddleware, videoController.updateVideoController)
 videosRouter.delete('/:id', videoController.deleteVideoController)
